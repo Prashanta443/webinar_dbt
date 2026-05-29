@@ -1,0 +1,136 @@
+version: 2
+
+# ============================================================
+# GOLD LAYER — PRODUCT PORTFOLIO FACT TABLE
+# ============================================================
+# Source     : stg_account + stg_customer
+# Strategy   : Full table refresh
+# Schema     : gold
+# Grain      : One row per product type (product_category + product_type_label)
+# Total rows : 5 (SA, CA, FD, RD, LD)
+# Owner      : Data Engineering Team
+# ============================================================
+
+models:
+  - name: fct_product_portfolio
+    description: >
+      Gold layer product portfolio summary table. Each row represents one product
+      type aggregated across all customers and accounts in the core banking system.
+      The grain is product_category + product_type_label giving 5 rows — one per
+      scheme type (Savings, Current, Fixed Deposit, Recurring Deposit, Loan).
+
+      This model answers the question: for each product type, how many customers
+      hold it, how many accounts exist, and what is the total balance?
+
+      Products are grouped into two high-level categories:
+        - Deposit products: Savings Account (SA), Current Account (CA),
+                            Fixed Deposit (FD), Recurring Deposit (RD)
+        - Loan products: Loan Account (LD)
+
+      Balance figures cover active accounts only (acct_cls_flg = 'N').
+      Sources: stg_account (account attributes and balances), stg_customer
+      (validates that each cif_id is a known customer via inner join).
+
+    meta:
+      owner: data_engineering
+      grain: one row per product_category + product_type_label
+      row_count: 5
+      update_frequency: daily
+      source_models: [stg_account, stg_customer]
+      tags: [gold, product, portfolio]
+
+    columns:
+      - name: product_category
+        description: >
+          High-level product classification. One of two values:
+            - 'Deposit' → customer is putting money into the bank (SA, CA, FD, RD)
+            - 'Loan'    → customer has borrowed money from the bank (LD)
+          Used for deposit vs loan portfolio split in dashboards and reports.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["Deposit", "Loan"]
+
+      - name: product_type_label
+        description: >
+          Human-readable label for the product type. Acts as the primary descriptive
+          key of this table — one row per label.
+          Possible values:
+            - 'Savings Account'    → scheme type SA
+            - 'Current Account'    → scheme type CA
+            - 'Fixed Deposit'      → scheme type FD
+            - 'Recurring Deposit'  → scheme type RD
+            - 'Loan Account'       → scheme type LD
+        tests:
+          - not_null
+          - unique
+          - accepted_values:
+              values: ["Savings Account", "Current Account", "Fixed Deposit",
+                       "Recurring Deposit", "Loan Account"]
+
+      - name: total_customers
+        description: >
+          Count of distinct customers (cif_id) who hold at least one account
+          under this product type, regardless of account status (active or closed).
+        tests:
+          - not_null
+
+      - name: active_customers
+        description: >
+          Count of distinct customers (cif_id) who hold at least one currently
+          active account (acct_cls_flg = 'N') under this product type.
+          Use this for current product penetration analysis.
+        tests:
+          - not_null
+
+      - name: churned_customers
+        description: >
+          Count of distinct customers (cif_id) whose accounts under this product
+          type are all closed (acct_cls_flg = 'Y'). These customers have churned
+          from this product. Useful for retention and re-engagement analysis.
+        tests:
+          - not_null
+
+      - name: total_accounts
+        description: >
+          Total count of accounts (foracid) under this product type, including
+          both active and closed accounts.
+        tests:
+          - not_null
+
+      - name: active_accounts
+        description: >
+          Count of accounts (foracid) that are currently active (acct_cls_flg = 'N')
+          under this product type.
+        tests:
+          - not_null
+
+      - name: closed_accounts
+        description: >
+          Count of accounts (foracid) that have been closed (acct_cls_flg = 'Y')
+          under this product type.
+        tests:
+          - not_null
+
+      - name: total_balance
+        description: >
+          Sum of clr_bal_amt (clear balance amount) across all active accounts
+          (acct_cls_flg = 'N') for this product type. Currency is mixed — accounts
+          may be in NPR, USD, EUR, GBP, INR, AED, AUD, or SGD.
+          Closed accounts are excluded from this figure.
+        tests:
+          - not_null
+
+      - name: avg_balance_per_account
+        description: >
+          Average clr_bal_amt per active account for this product type.
+          Useful for benchmarking product performance and customer engagement.
+          Can be null if there are no active accounts for the product type.
+
+      - name: dbt_updated_at
+        description: >
+          Timestamp when this row was last written by a dbt run.
+          Set to current_timestamp at model execution time.
+          Used for audit and pipeline SLA monitoring.
+        tests:
+          - not_null

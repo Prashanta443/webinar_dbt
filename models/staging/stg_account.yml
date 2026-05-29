@@ -1,0 +1,110 @@
+version: 2
+
+models:
+  - name: stg_account
+    description: >
+      Staging model for customer bank accounts sourced from the core banking system (CBS).
+      Each row represents a single account held by a customer. A customer (identified by cif_id)
+      can hold multiple accounts across different branches and account types. This model is the
+      foundation for account-level analysis including balances, product types, and account status.
+
+    columns:
+      - name: foracid
+        description: >
+          Account number — the unique identifier for each bank account.
+          One customer (cif_id) can have multiple foracid values across different branches or products.
+        tests:
+          - not_null
+          - unique
+
+      - name: cif_id
+        description: >
+          Customer ID — uniquely identifies the customer who owns the account.
+          Links to dim_customers and stg_customer. A single cif_id may appear multiple times
+          in this table if the customer holds more than one account.
+        tests:
+          - not_null
+
+      - name: branch_id
+        description: >
+          Branch ID — identifies the bank branch where the account was opened and is maintained.
+          An account belongs to exactly one branch, but a customer can have accounts at multiple branches.
+        tests:
+          - not_null
+
+      - name: clr_bal_amt
+        description: >
+          Clear Balance Amount — the current available balance in the account after clearing
+          all pending transactions. This is the actual usable balance for the account holder.
+
+      - name: lien_amt
+        description: >
+          Lien Amount — the portion of the account balance that is frozen and cannot be
+          withdrawn or used for transactions. The balance is frozen due to reasons such as
+          loan collateral, legal hold, court order, or a fixed deposit pledge.
+          Effective available balance = clr_bal_amt - lien_amt.
+
+      - name: acct_cls_flg
+        description: >
+          Account Closed Flag — indicates whether the account is active or closed.
+          Possible values:
+            - 'N' → Account is active and operational.
+            - 'Y' → Account has been closed and is no longer active.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Y', 'N']
+
+      - name: product_id
+        description: >
+          Product ID — internal identifier for the specific banking product associated with the account
+          (e.g., a specific savings product, loan variant, or deposit scheme).
+
+      - name: schm_type
+        description: >
+          Scheme Type — categorizes the account into a broad product type.
+          Possible values:
+            - 'SA' → Savings Account: a standard deposit account earning interest.
+            - 'CA' → Current Account: a transactional account typically used by businesses, no interest.
+            - 'FD' → Fixed Deposit: a term deposit with a fixed interest rate and maturity date.
+            - 'RD' → Recurring Deposit: a periodic deposit scheme where the customer deposits a fixed
+                      amount each month until maturity.
+            - 'LD' → Loan Account: a credit account representing a loan disbursed to the customer.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['SA', 'CA', 'FD', 'RD', 'LD']
+
+      - name: schm_code
+        description: >
+          Scheme Code — a sub-category within schm_type that identifies the specific product
+          variant. Each scheme code belongs to exactly one scheme type:
+            - SAV001, SAV002, SAV003 → Savings Account (schm_type = 'SA')
+            - CUR001, CUR002         → Current Account (schm_type = 'CA')
+            - FXD001, FXD002, FXD003, FXD004 → Fixed Deposit (schm_type = 'FD')
+            - REC001, REC002         → Recurring Deposit (schm_type = 'RD')
+            - LON001, LON002, LON003, LON004 → Loan Account (schm_type = 'LD')
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['SAV001', 'SAV002', 'SAV003', 'CUR001', 'CUR002',
+                       'FXD001', 'FXD002', 'FXD003', 'FXD004',
+                       'REC001', 'REC002', 'LON001', 'LON002', 'LON003', 'LON004']
+
+      - name: acct_crncy_code
+        description: >
+          Account Currency Code — the ISO 4217 currency code representing the currency in which
+          the account conducts its transactions. All balances (clr_bal_amt, lien_amt) are in this currency.
+          Possible values:
+            - 'NPR' → Nepalese Rupee
+            - 'USD' → US Dollar
+            - 'EUR' → Euro
+            - 'GBP' → British Pound Sterling
+            - 'INR' → Indian Rupee
+            - 'AED' → UAE Dirham
+            - 'AUD' → Australian Dollar
+            - 'SGD' → Singapore Dollar
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['NPR', 'USD', 'EUR', 'GBP', 'INR', 'AED', 'AUD', 'SGD']

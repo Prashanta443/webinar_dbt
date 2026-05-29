@@ -1,0 +1,12 @@
+webinar:
+  outputs:
+    dev:
+      dbname: dlyticademo
+      host: 198.244.140.152
+      pass: dlyticademo
+      port: 30101
+      schema: public
+      threads: 1
+      type: postgres
+      user: dlyticademo
+  target: dev

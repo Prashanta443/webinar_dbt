@@ -1,0 +1,16 @@
+version: 2
+
+sources:
+  - name: cbs
+    database: dlyticademo
+    schema: public
+    tables:
+      - name: customer
+        description: >
+          Raw customer data from CBS. Contains customer Information.
+      - name: account
+        description: >
+          Raw account data from CBS. Contains account details linked to customers.
+      - name: hist_transactional
+        description: >
+          Raw transaction history from CBS.it contains historical transactional data. for each account, including transaction amounts, dates, and types.
